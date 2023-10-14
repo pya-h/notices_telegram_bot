@@ -5,8 +5,7 @@ require_once './user.php';
 require_once  './menu.php';
 require_once  './notice.php';
 
-function isGodEnough(): bool
-{
+function isGodEnough(): bool {
     // just trying to be funny:|
     return count(
             Database::getInstance()->query(
@@ -14,8 +13,7 @@ function isGodEnough(): bool
         )) >= MAX_GODS;
 }
 
-function handleGospel(&$user, $whisper): ?string
-{
+function handleGospel(&$user, $whisper): ?string {
     // handle god login requests
     $answer = null;
     switch($user[DB_USER_ACTION]) {
@@ -41,8 +39,19 @@ function handleGospel(&$user, $whisper): ?string
     return $answer;
 }
 
-function addFootnote($text, $footnote = '@Persian_project') {
+function addFootnote($text, $footnote = '@Persian_project'): string {
     return $text . "\n- - - - - - - - - - - - - - - - - - - -\n" . $footnote;
+}
+
+function closeNotifications($notice_id, $closing_message) {
+    foreach(getNotifications($notice_id) as &$notif) {
+        callMethod(METH_EDIT_MESSAGE,
+            CHAT_ID, $notif[DB_NOTIFICATIONS_USER_ID],
+            MESSAGE_ID_TAG, $notif[DB_NOTIFICATIONS_MESSAGE_ID],
+            TEXT_TAG, $closing_message
+        );
+    }
+    deleteNotifications($notice_id);
 }
 
 function handleCasualMessage(&$update) {
@@ -150,7 +159,7 @@ function handleCasualMessage(&$update) {
                     $response = addFootnote(
                         addFootnote('✅ آگهی شما بصورت زیر با موفقیت برای مدیر ارسال شد و پس از تایید، داخل کانال قرار خواهد گرفت', $data));
                     foreach(getSuperiors() as &$admin) {
-                        callMethod(METH_SEND_MESSAGE,
+                        $telegram_response = callMethod(METH_SEND_MESSAGE,
                             CHAT_ID, $admin[DB_USER_ID],
                             TEXT_TAG, $data,
                             KEYBOARD, array(
@@ -170,6 +179,7 @@ function handleCasualMessage(&$update) {
                                 )
                             )
                         );
+                        saveNotification($admin[DB_USER_ID], $notice_id, getSentMessageId($telegram_response));
                     }
 
                 } else
@@ -316,13 +326,12 @@ function handleCasualMessage(&$update) {
                             } else {
                                 $response = 'چنین پیامی اصلا وجود نداره که بخوای جوابش رو بدی!';
                             }
-                            resetAction($user_id);
                             break;
                         default:
                             $response = 'عملیات موردنظر تعریف نشده است!';
-                            resetAction($user_id);
                             break;
                     }
+                    resetAction($user_id);
                 }
                 break;
         }
@@ -388,7 +397,7 @@ function handleCallbackQuery(&$update) {
                 $result = setNoticeVerificationState($data[DB_ITEM_ID]);
                 if(!isset($result['err']) && isset($result['notice'])) {
                     // send the notice to the channel
-                    $channel_response = callMethod(METH_SEND_MESSAGE,
+                    $telegram_response = callMethod(METH_SEND_MESSAGE,
                         TEXT_TAG, addFootnote($result['notice'][DB_NOTICES_TEXT] . "\n@" . $result['notice'][DB_NOTICES_APPLIER_USERNAME]),
                         CHAT_ID, PERSIAN_PROJECT_CHANNEL_ID,
                         KEYBOARD, array(
@@ -400,8 +409,7 @@ function handleCallbackQuery(&$update) {
                             )
                         )
                     );
-                    $channel_response = json_decode($channel_response, true);
-                    $channel_msg_id = $channel_response['result'][MESSAGE_ID_TAG] ?? null;
+                    $channel_msg_id = getSentMessageId($telegram_response);
                     $warning = $channel_msg_id && linkNoticeToChannelMessage($result['notice'][DB_ITEM_ID], $channel_msg_id)
                         ? '' : "\n\n هشدار: متاسفانه حین لینک آگهی به پیام مربوطه در کانال مشکلی پیش آمد. این باعث میشود برخی عملیات های مربوط به این آگهی به درستی عمل نکنند!" .
                             "\n آیدی آگهی: " . $result['notice'][DB_ITEM_ID];
@@ -426,11 +434,12 @@ function handleCallbackQuery(&$update) {
                         )
                     );
                     $answer = addFootnote($text, 'آگهی با موفقیت تایید شد و در کانال قرار گرفت.' . $warning);
-                    break;
+                    closeNotifications($result['notice'][DB_ITEM_ID], $answer);
+                    exit();
                 } else $answer = addFootnote($text, $result['err']);
             }
             else
-                $answer = $text . '\n----------------\n آیدی آگهی مورد نظر اشتباه است!';
+                $answer = addFootnote($text, 'آیدی آگهی مورد نظر اشتباه است!');
             break;
         case INLINE_ACTION_REJECT_NOTICE:
             if(isset($data[DB_ITEM_ID])) {
@@ -442,11 +451,13 @@ function handleCallbackQuery(&$update) {
                         REPLY_TO_TAG, $result['notice'][DB_NOTICES_USER_MESSAGE_ID]
                     );
                     $answer = addFootnote($text, " آگهی ریجکت شد.");
+                    closeNotifications($result['notice'][DB_ITEM_ID], $answer);
+                    exit();
                 } else $answer = addFootnote($text, $result['err']);
                 break;
             }
             else
-                $answer = 'آیدی آگهی مورد نظر اشتباه است!';
+                $answer = addFootnote($text, 'آیدی آگهی مورد نظر اشتباه است!');
             break;
         case INLINE_ACTION_DELEGATE_NOTICE:
             if(isset($data[DB_ITEM_ID])) {

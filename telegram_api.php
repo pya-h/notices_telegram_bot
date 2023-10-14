@@ -88,8 +88,7 @@ function callMethod($method, ...$params) {
     return curl_exec($req_handle);
 }
 
-function getFileFrom($message): ?array
-{
+function getFileFrom($message): ?array {
     $file_types = [FILE_PHOTO, FILE_VOICE, FILE_VIDEO, FILE_AUDIO, FILE_DOCUMENT];
 
     foreach($file_types as &$tag) {
@@ -104,7 +103,12 @@ function getFileFrom($message): ?array
     return null;
 }
 
-function isUsernameValid(&$username) {
+function getSentMessageId($telegram_response) {
+    $channel_response = json_decode($telegram_response, true);
+    return $channel_response['result'][MESSAGE_ID_TAG] ?? null;
+}
+
+function isUsernameValid(&$username): bool {
     return preg_match("/^[a-zA-Z]{1}[A-Za-z0-9_]{4,}$/", $username) && $username[-1] != '_';
 }
 

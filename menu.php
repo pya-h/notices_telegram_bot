@@ -19,8 +19,7 @@ defined('CMD_MAIN_MENU') or define('CMD_MAIN_MENU', 'بازگشت به منو �
 
 defined('CMD_GOD_ACCESS') or define('CMD_GOD_ACCESS', '/godAccess');
 
-function alignButtons($items, $action_value, $callback_value_column, $item_caption = null): array
-{
+function alignButtons($items, $action_value, $callback_value_column, $item_caption = null): array {
     $buttons = array(array()); // an inline keyboard
     $current_row = 0;
     $column_length = 0;
@@ -43,8 +42,7 @@ function alignButtons($items, $action_value, $callback_value_column, $item_capti
     return $buttons;
 }
 
-function createInlineMenu($table_name, $menu_action, $item_caption, $filter_query = null): ?array
-{
+function createInlineMenu($table_name, $menu_action, $item_caption, $filter_query = null): ?array {
     $query = 'SELECT * FROM ' . $table_name;
     if($filter_query)
         $query .= ' WHERE ' . $filter_query;
@@ -54,8 +52,7 @@ function createInlineMenu($table_name, $menu_action, $item_caption, $filter_quer
     // return array(INLINE_KEYBOARD => alignButtons($items, $menu_action, DB_ITEM_ID, $item_caption));
 }
 
-function getMainMenu($user_mode): array
-{
+function getMainMenu($user_mode): array {
     $keyboard = array('resize_keyboard' => true, 'one_time_keyboard' => true,
             'keyboard' => array(array(CMD_YOUR_NOTICES, CMD_SUBMIT_NOTICE))
     );
@@ -70,8 +67,7 @@ function getMainMenu($user_mode): array
     return $keyboard;
 }
 
-function backToMainMenuKeyboard($second_option=null): array
-{
+function backToMainMenuKeyboard($second_option=null): array {
     $keyboard = array('resize_keyboard' => true, 'one_time_keyboard' => true,
         'keyboard' => array(
             array(CMD_MAIN_MENU)

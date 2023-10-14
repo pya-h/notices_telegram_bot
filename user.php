@@ -15,7 +15,7 @@ defined('ACTION_ASSIGN_USER_NAME') or define('ACTION_ASSIGN_USER_NAME', 12);
 
 defined('ACTION_ADD_ADMIN') or define('ACTION_ADD_ADMIN', 11);
 
-function getSuperiors() {
+function getSuperiors(): ?array {
     // get admin and gods
     return Database::getInstance()->query('SELECT * FROM '. DB_TABLE_USERS 
         .' WHERE ' . DB_USER_MODE . '=' . GOD_USER . ' OR ' . DB_USER_MODE . '=' . ADMIN_USER);
@@ -60,16 +60,24 @@ function updateActionCache($id, $cache) {
         array('id' => $id, 'cache' => $cache));
 }
 
-function resetAction($id): bool
-{
+function resetAction($id): bool {
     return updateAction($id, ACTION_NONE, true);
 }
 
 function saveMessage($sender_id, $message_id) {
-    Database::getInstance()->insert('INSERT INTO '. DB_TABLE_MESSAGES 
+    return Database::getInstance()->insert('INSERT INTO '. DB_TABLE_MESSAGES
         . ' (' . DB_ITEM_ID . ', ' . DB_MESSAGES_SENDER_ID . ') VALUES (:message_id, :sender_id)', array(
             MESSAGE_ID_TAG => $message_id, 'sender_id' => $sender_id
     ));
+}
+
+function saveNotification($user_id, $notice_id, $message_id) {
+    $fields = implode(',', [DB_NOTIFICATIONS_USER_ID, DB_NOTIFICATIONS_MESSAGE_ID, DB_NOTIFICATIONS_RELATED_NOTICE_ID]);
+    return Database::getInstance()->insert('INSERT INTO '. DB_TABLE_NOTIFICATIONS
+        . " ($fields) VALUES (:user_id, :message_id, :notice_id)", array(
+            "user_id" => $user_id, "message_id" => $message_id, 'notice_id' => $notice_id
+        )
+    );
 }
 
 function markMessageAsAnswered($message_id) {
@@ -95,6 +103,16 @@ function assignUserName($id, $name) {
         array('id' => $id, 'name' => $name));
 }
 
-function accountLink($username) {
+function accountLink($username): string {
     return 'https://t.me/' . $username;
+}
+
+function getNotifications($notice_id): ?array {
+    return Database::getInstance()->query('SELECT * FROM '. DB_TABLE_NOTIFICATIONS
+        .' WHERE ' . DB_NOTIFICATIONS_RELATED_NOTICE_ID . '=:notice_id', array('notice_id' => $notice_id));
+}
+
+function deleteNotifications($notice_id): ?array {
+    return Database::getInstance()->query('DELETE FROM '. DB_TABLE_NOTIFICATIONS
+        .' WHERE ' . DB_NOTIFICATIONS_RELATED_NOTICE_ID . '=:notice_id', array('notice_id' => $notice_id));
 }

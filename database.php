@@ -1,8 +1,4 @@
 <?php
-defined('RELATED_DATA_SEPARATOR') or define('RELATED_DATA_SEPARATOR', '/');
-defined('DATA_JOIN_SIGN') or define('DATA_JOIN_SIGN', '<>');
-defined('INDEX_SEPARATOR') or define('INDEX_SEPARATOR', ':');
-
 // config
 defined('DB_HOST') or define('DB_HOST', 'localhost');
 defined('DB_USER') or define('DB_USER', 'dbusername');
@@ -13,6 +9,7 @@ defined('DB_NAME') or define('DB_NAME','dbname');
 defined('DB_TABLE_USERS') or define('DB_TABLE_USERS','users');
 defined('DB_TABLE_NOTICES') or define('DB_TABLE_NOTICES','notices');
 defined('DB_TABLE_MESSAGES') or define('DB_TABLE_MESSAGES','messages');
+defined('DB_TABLE_NOTIFICATIONS') or define('DB_TABLE_NOTIFICATIONS','notifications');
 
 // database table:COMMON fields
 defined('DB_ITEM_ID') or define('DB_ITEM_ID','id');
@@ -28,7 +25,7 @@ defined('DB_USER_ACTION_CACHE') or define('DB_USER_ACTION_CACHE','action_cache')
 defined('DB_MESSAGES_SENDER_ID') or define('DB_MESSAGES_SENDER_ID','sender_id');
 defined('DB_MESSAGES_ANSWERED') or define('DB_MESSAGES_ANSWERED','answered');
 
-//database table: notices fields:
+//database table:notices fields:
 defined('DB_NOTICES_TEXT') or define('DB_NOTICES_TEXT','text');
 defined('DB_NOTICES_APPLIER_ID') or define('DB_NOTICES_APPLIER_ID','applier_id');
 defined('DB_NOTICES_APPLIER_USERNAME') or define('DB_NOTICES_APPLIER_USERNAME','username');
@@ -40,20 +37,25 @@ defined('DB_NOTICES_VERIFIED') or define('DB_NOTICES_VERIFIED','verified');
 defined('DB_NOTICES_USER_MESSAGE_ID') or define('DB_NOTICES_USER_MESSAGE_ID','user_msg_id');
 defined('DB_NOTICES_CHANNEL_MESSAGE_ID') or define('DB_NOTICES_CHANNEL_MESSAGE_ID','channel_msg_id');
 
+//database table:notices values
 defined('NOTICE_VERIFIED') or define('NOTICE_VERIFIED', 1);
 defined('NOTICE_REJECTED') or define('NOTICE_REJECTED', 0);
 defined('NOTICE_VERIFICATION_PENDING') or define('NOTICE_VERIFICATION_PENDING', -1);
 
-defined('NOTICE_CLOSED') or define('NOTICE_VERIFIED', -1);
+defined('NOTICE_CLOSED') or define('NOTICE_CLOSED', -1);
 defined('NOTICE_OPEN') or define('NOTICE_OPEN', 0);
 defined('NOTICE_DELEGATED') or define('NOTICE_DELEGATED', 1);
+
+//database table:notifications fields
+defined('DB_NOTIFICATIONS_USER_ID') or define('DB_NOTIFICATIONS_USER_ID', 'user_id');
+defined('DB_NOTIFICATIONS_MESSAGE_ID') or define('DB_NOTIFICATIONS_MESSAGE_ID', 'message_id');
+defined('DB_NOTIFICATIONS_RELATED_NOTICE_ID') or define('DB_NOTIFICATIONS_RELATED_NOTICE_ID', 'notice_id');
 
 //database: god mode
 defined('GOD_NAME') or define('GOD_NAME','superuser name');
 defined('GOD_SECRET') or define('GOD_SECRET','superuser pass');
 
 defined('MAX_GODS') or define('MAX_GODS', 2);
-
 
 // user modes:
 defined('NORMAL_USER') or define('NORMAL_USER', 0);
@@ -112,7 +114,7 @@ class Database {
     return $this->connection->query($sql_query);
   }
 
-  public function query($sql_query, $query_data = null, $specific_column = null){
+  public function query($sql_query, $query_data = null, $specific_column = null): ?array {
     $result = $this->safeQuery($sql_query, $query_data);
     if (!$result) {
       echo "Query: " . $sql_query . " failed due to " . mysqli_error($this->connection);
@@ -134,7 +136,7 @@ class Database {
     return $this->connection;
   }
 
-  public function fuckoff(){
+  public function fuckoff() {
     $this->connection->close();
   }
 
@@ -142,8 +144,7 @@ class Database {
 
 // project specific functions:
 
-function getStatistics(): array
-{
+function getStatistics(): array {
     $db = Database::getInstance();
     $users = $db->query('SELECT * FROM ' . DB_TABLE_USERS);
     $other_tables = array(DB_TABLE_NOTICES => 'تعداد کل آگهی ها', DB_TABLE_MESSAGES => "تعداد پیام های کاربران");
