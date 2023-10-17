@@ -21,8 +21,8 @@ function getSuperiors(): ?array {
         .' WHERE ' . DB_USER_MODE . '=' . GOD_USER . ' OR ' . DB_USER_MODE . '=' . ADMIN_USER);
 }
 
-function getCertainUsers($user_mode) {
-    $user = Database::getInstance()->query('SELECT * FROM '. DB_TABLE_USERS 
+function getCertainUsers(int $user_mode) {
+    return Database::getInstance()->query('SELECT * FROM '. DB_TABLE_USERS 
         .' WHERE ' . DB_USER_MODE . '=:mode', array('mode' => $user_mode));
 }
 
@@ -41,7 +41,7 @@ function getUser($id) {
     return array(DB_USER_ID => $id, DB_USER_MODE => NORMAL_USER, DB_USER_ACTION => ACTION_NONE, DB_USER_ACTION_CACHE => null);
 }
 
-function updateAction($id, $action, $reset_cache = false) {
+function updateAction($id, int $action, bool $reset_cache = false) {
     $query = 'UPDATE ' . DB_TABLE_USERS . ' SET ' . DB_USER_ACTION . '=:action';
     if($reset_cache)
         $query .= ', ' . DB_USER_ACTION_CACHE . '=NULL';
@@ -50,7 +50,7 @@ function updateAction($id, $action, $reset_cache = false) {
 }
 
 
-function updateUserMode($id, $mode) {
+function updateUserMode($id, int $mode) {
     return Database::getInstance()->update('UPDATE ' . DB_TABLE_USERS . ' SET ' . DB_USER_MODE . '=:mode WHERE ' . DB_USER_ID . '=:id',
         array('id' => $id, 'mode' => $mode));
 }
@@ -58,6 +58,12 @@ function updateUserMode($id, $mode) {
 function updateActionCache($id, $cache) {
     return Database::getInstance()->update('UPDATE ' . DB_TABLE_USERS . ' SET ' . DB_USER_ACTION_CACHE . '=:cache WHERE ' . DB_USER_ID . '=:id',
         array('id' => $id, 'cache' => $cache));
+}
+
+function setActionAndCache($id, int $action, $cache) {
+    return Database::getInstance()->update('UPDATE ' . DB_TABLE_USERS . ' SET ' . DB_USER_ACTION . '=:action,'
+            . DB_USER_ACTION_CACHE . '=:cache WHERE ' . DB_USER_ID . '=:id',
+        array('id' => $id, 'action' => $action, 'cache' => $cache));
 }
 
 function resetAction($id): bool {
@@ -98,12 +104,12 @@ function getMessage($message_id) {
     return count($msg) ? $msg[0] : null;
 }
 
-function assignUserName($id, $name) {
+function assignUserName($id, string &$name) {
     return Database::getInstance()->update('UPDATE ' . DB_TABLE_USERS . ' SET ' . DB_ITEM_NAME . '=:name WHERE ' . DB_USER_ID . '=:id',
         array('id' => $id, 'name' => $name));
 }
 
-function accountLink($username): string {
+function accountLink(string $username): string {
     return 'https://t.me/' . $username;
 }
 

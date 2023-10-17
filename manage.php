@@ -13,7 +13,7 @@ function isGodEnough(): bool {
         )) >= MAX_GODS;
 }
 
-function handleGospel(&$user, $whisper): ?string {
+function handleGospel(&$user, string &$whisper): ?string {
     // handle god login requests
     $answer = null;
     switch($user[DB_USER_ACTION]) {
@@ -28,22 +28,26 @@ function handleGospel(&$user, $whisper): ?string {
             break;
         case ACTION_WHISPER_GODS_SECRET:
             if($whisper === GOD_SECRET && !isGodEnough()) {
-                if(!updateUserMode($user[DB_USER_ID], GOD_USER))
-                    $answer = 'خطایی حین ثبت اطلاعات پیش اومد. دوباره تلاش کن!';
-                $user[DB_USER_MODE] = GOD_USER; // update the old user object
+                if(updateUserMode($user[DB_USER_ID], GOD_USER)) {
+                    $user[DB_USER_MODE] = GOD_USER; // update the old user object
+                    $answer = 'Now you\'re God Almighty :)!';
+                } else $answer = 'خطایی حین ثبت اطلاعات پیش اومد. دوباره تلاش کن!';
                 resetAction($user[DB_USER_ID]);
-                $answer = 'Now you\'re God Almighty :)!';
             }
             break;
     }
     return $answer;
 }
 
-function addFootnote($text, $footnote = '@Persian_project'): string {
+function addFootnote(string $text, string $footnote = '@Persian_project'): string {
     return $text . "\n- - - - - - - - - - - - - - - - - - - -\n" . $footnote;
 }
 
-function closeNotifications($notice_id, $closing_message) {
+function appendUsername(string &$text, string &$username): string {
+    return $text . "\n@" . $username;
+}
+
+function closeNotifications($notice_id, string &$closing_message) {
     foreach(getNotifications($notice_id) as &$notif) {
         callMethod(METH_EDIT_MESSAGE,
             CHAT_ID, $notif[DB_NOTIFICATIONS_USER_ID],
@@ -65,7 +69,7 @@ function handleCasualMessage(&$update) {
     $message_id = $update['message'][MESSAGE_ID_TAG];
 
     $data = $message[TEXT_TAG] ?? null;
-    $response = handleGospel($user, $data);
+    if($data) $response = handleGospel($user, $data);
     $keyboard = getMainMenu($user[DB_USER_MODE]);
 
     if(!$response) {
@@ -93,8 +97,9 @@ function handleCasualMessage(&$update) {
                 resetAction($user_id);
                 break;
             case CMD_SUBMIT_NOTICE:
-                $response = "⚠️⚖️ قوانین ثبت آگهی:
-
+                if(updateAction($user_id, ACTION_SET_APPLIER_USERNAME)) {
+                    $response = "⚠️⚖️ قوانین ثبت آگهی:
+    
 1️⃣ آگهی باید برای یک خواسته و نیازمندی باشه یعنی نمیتونی چندتا موضوع مختلف رو توی یه آگهی ثبت کنی!
 
 2️⃣ توی متن آگهی نباید از لینک و موارد تبلیغاتی استفاده کنی!
@@ -102,26 +107,30 @@ function handleCasualMessage(&$update) {
 3️⃣ متن آگهی باید منطبق بر عرف و بدون توهین باشه.
 
 4️⃣ آگهی برای امتحان، پایان‌نامه و پرپوزال ممنوعه و تیم پشتیبانی این آگهی‌ها رو رد میکنه.";
-                if(!updateAction($user_id, ACTION_SET_APPLIER_USERNAME)) {
+                    $keyboard = backToMainMenuKeyboard(CMD_ACCEPT_AGREEMENTS);
+                } else {
                     $response = 'حین ورود به حالت ارسال آگهی مشکلی پیش اومد. لطفا دوباره تلاش کن!';
                     resetAction($user_id);
-                } else
-                    $keyboard = backToMainMenuKeyboard(CMD_ACCEPT_AGREEMENTS);
+                }
                 break;
             case CMD_ACCEPT_AGREEMENTS:
                 if($user[DB_USER_ACTION] == ACTION_SET_APPLIER_USERNAME) {
                     $response = "📝 یوزرنیم صاحب آگهی را وارد کنید:";
                     $keyboard = backToMainMenuKeyboard(CMD_USE_MY_USERNAME);
-                } else
+                } else {
                     $response = 'متوجه نشدم. لطفا دوباره تلاش کن!';
+                    resetAction($user_id);
+                }
                 break;
             case CMD_YOUR_NOTICES:
+                resetAction($user_id);
                 $keyboard = createInlineMenu(DB_TABLE_NOTICES, INLINE_ACTION_SELECT_YOUR_NOTICE, DB_NOTICES_DATE, DB_NOTICES_APPLIER_ID . "=$user_id");
                 $response = $keyboard ? 'تمامی آگهی های شما بر حسب تاریخ ثبت، لیست شده اند. آگهی مورد نظر خود را انتخاب کنید:'
                                      : 'شما تاکنون هیچ آگهی ای ثبت نکرده اید!';
                 break;
             default:
                 $response = null;
+                resetAction($user_id);
                 break;
         }
     }
@@ -141,13 +150,13 @@ function handleCasualMessage(&$update) {
                 } else $applier_username = $data[0] != '@' ? $data : substr($data, 1);
                 //check username
                 if(isUsernameValid($applier_username)) {
-                    $response = "🔸 لطفا متن آگهی خود را بصورت صحیح و بدون غلط املایی وارد کنید. \n\nمثال:\nبه فردی مسلط به ریاضی عمومی یک ، برای رفع اشکال نیازمندم.";
-                    if(!updateAction($user_id, ACTION_SUBMIT_NOTICE) || !updateActionCache($user_id, $applier_username)) {
+                    if(setActionAndCache($user_id, ACTION_SUBMIT_NOTICE, $applier_username)) {
+                        $response = "🔸 لطفا متن آگهی خود را بصورت صحیح و بدون غلط املایی وارد کنید. \n\nمثال:\nبه فردی مسلط به ریاضی عمومی یک ، برای رفع اشکال نیازمندم.";
+                        $keyboard = backToMainMenuKeyboard();
+                    } else {
                         $response = 'حین ورود به حالت ارسال آگهی مشکلی پیش اومد. لطفا دوباره تلاش کن!';
                         resetAction($user_id);
-                    } else
-                        $keyboard = backToMainMenuKeyboard();
-
+                    }
                 } else {
                     $response = 'یوزرنیم وارد شده مطابق با الگوی تلگرام نیست. لطفا یوزرنیم معتبر وارد کنید:';
                     $keyboard = backToMainMenuKeyboard(CMD_USE_MY_USERNAME);
@@ -195,16 +204,17 @@ function handleCasualMessage(&$update) {
                 if($user[DB_USER_ACTION] == ACTION_NONE) {
                     switch($data) {
                         case CMD_SUPPORT:
-                            $response = 'متن خود را در قالب یک پیام ارسال کنید.📝';
-                            $keyboard = backToMainMenuKeyboard();
-                            if(!updateAction($user_id, ACTION_WRITE_MESSAGE_TO_ADMIN)) {
+                            if(updateAction($user_id, ACTION_WRITE_MESSAGE_TO_ADMIN)) {
+                                $response = 'متن خود را در قالب یک پیام ارسال کنید.📝';
+                                $keyboard = backToMainMenuKeyboard();
+                            } else {
                                 $response = 'حین ورود به حالت ارسال پیام مشکلی پیش اومد. لطفا دوباره تلاش کن!';
                                 resetAction($user_id);
                             }
                             break;
-
                         default:
                             $response = 'دستور مورد نظر صحیح نیست!';
+                            resetAction($user_id);
                             break;
                     }
                 } else if($user[DB_USER_ACTION] == ACTION_WRITE_MESSAGE_TO_ADMIN){
@@ -235,20 +245,18 @@ function handleCasualMessage(&$update) {
                 break;
             case GOD_USER:
                 if($data === CMD_ADD_ADMIN) {
-                    $response = 'یک پیام از اکانت موردنظرت فوروارد کن:';
-                    if(!updateAction($user_id, ACTION_ADD_ADMIN)) {
+                    if(updateAction($user_id, ACTION_ADD_ADMIN)) {
+                        $response = 'یک پیام از اکانت موردنظرت فوروارد کن:';
+                        $keyboard = backToMainMenuKeyboard();
+                    } else {
                         $response = 'مشکلی حین ورود به حالت اضافه کردن ادمین پیش اومده. لطفا دوباره تلاش کن!';
                         resetAction($user_id);
                     }
                     break;
                 } else if($user[DB_USER_ACTION] == ACTION_ADD_ADMIN) {
                     if(isset($message['forward_from'])) {
-
                         $target_id = $message['forward_from']['id'];
-                        if(!updateUserMode($target_id, ADMIN_USER)) {
-                            $response = 'متاسفانه مشکلی حین ثبت اکانت بعنوان ادمین پیش اومده. لطفا دوباره تلاش کن!';
-                            resetAction($user_id);
-                        } else {
+                        if(updateUserMode($target_id, ADMIN_USER)) {
                             $response = 'اکانت موردنظر بعنوان ادمین ثبت شد!';
                             // notify the target user
                             callMethod(METH_SEND_MESSAGE,
@@ -256,12 +264,15 @@ function handleCasualMessage(&$update) {
                                 TEXT_TAG, 'تبریک! اکانتت به دسترسی ادمین ارتقا پیدا کرد.',
                                 KEYBOARD, getMainMenu(ADMIN_USER)
                             );
-                            if(!updateAction($user_id, ACTION_ASSIGN_USER_NAME) || !updateActionCache($user_id, $target_id)) {
+                            if(setActionAndCache($user_id, ACTION_ASSIGN_USER_NAME, $target_id)) {
+                                $response .= ' حالا یک اسم براش تعیین کن:';
+                            } else {
                                 $response .= ' اما حین ورود به حالت تعیین اسم مشکلی پیش اومد!';
                                 resetAction($user_id);
-                            } else {
-                                $response .= ' حالا یک اسم براش تعیین کن:';
                             }
+                        } else {
+                            $response = 'متاسفانه مشکلی حین ثبت اکانت بعنوان ادمین پیش اومده. لطفا دوباره تلاش کن!';
+                            resetAction($user_id);
                         }
                     } else {
                         $response = 'اکانت موردنظر حالت مخفی رو فعال کرده. برای ارتقا یافتن به ادمین باید موقتا این حالت رو غیرفعال کنه!';
@@ -297,8 +308,7 @@ function handleCasualMessage(&$update) {
                             $response = 'دستور مورد نظر صحیح نیست!';
                             break;
                     }
-                }
-                else {
+                } else {
                     switch($user[DB_USER_ACTION]) {
                         case ACTION_WRITE_REPLY_TO_USER:
                             $msg = getMessage($user[DB_USER_ACTION_CACHE]);
@@ -360,7 +370,7 @@ function handleCallbackQuery(&$update) {
     $message_id = $update[CALLBACK_QUERY]['message'][MESSAGE_ID_TAG];
     $user_id = $update[CALLBACK_QUERY]['from']['id'];
     $data = json_decode($update[CALLBACK_QUERY]['data'], true);
-    $text = $update[CALLBACK_QUERY]['message']['text'];
+    $text = $update[CALLBACK_QUERY]['message'][TEXT_TAG];
     $answer = null;
     $keyboard = null;
     $user = getUser($user_id);
@@ -391,14 +401,14 @@ function handleCallbackQuery(&$update) {
             } else
                 $answer = 'خطای غیرمنتظره حین باز کردن پیام اتفاق افتاد!';
             break;
-
+            
         case INLINE_ACTION_VERIFY_NOTICE:
             if(isset($data[DB_ITEM_ID])) {
                 $result = setNoticeVerificationState($data[DB_ITEM_ID]);
                 if(!isset($result['err']) && isset($result['notice'])) {
                     // send the notice to the channel
                     $telegram_response = callMethod(METH_SEND_MESSAGE,
-                        TEXT_TAG, addFootnote($result['notice'][DB_NOTICES_TEXT] . "\n@" . $result['notice'][DB_NOTICES_APPLIER_USERNAME]),
+                        TEXT_TAG, addFootnote(appendUsername($result['notice'][DB_NOTICES_TEXT], $result['notice'][DB_NOTICES_APPLIER_USERNAME])),
                         CHAT_ID, PERSIAN_PROJECT_CHANNEL_ID,
                         KEYBOARD, array(
                             INLINE_KEYBOARD => array(
@@ -410,7 +420,7 @@ function handleCallbackQuery(&$update) {
                         )
                     );
                     $channel_msg_id = getSentMessageId($telegram_response);
-                    $warning = $channel_msg_id && linkNoticeToChannelMessage($result['notice'][DB_ITEM_ID], $channel_msg_id)
+                    $warning = $channel_msg_id && linkNoticeToChannelMessage($result['notice'][DB_ITEM_ID], $channel_msg_id) 
                         ? '' : "\n\n هشدار: متاسفانه حین لینک آگهی به پیام مربوطه در کانال مشکلی پیش آمد. این باعث میشود برخی عملیات های مربوط به این آگهی به درستی عمل نکنند!" .
                             "\n آیدی آگهی: " . $result['notice'][DB_ITEM_ID];
 
@@ -421,10 +431,10 @@ function handleCallbackQuery(&$update) {
                         KEYBOARD, array(
                             INLINE_KEYBOARD => array(
                                 array(
-                                    array(TEXT_TAG => 'کانال',
+                                    array(TEXT_TAG => 'کانال', 
                                         INLINE_URL_TAG => PERSIAN_PROJECT_CHANNEL_URL
                                     ),
-                                    array(TEXT_TAG => 'واگذاری',
+                                    array(TEXT_TAG => 'واگذاری', 
                                         CALLBACK_DATA => wrapInlineButtonData(INLINE_ACTION_DELEGATE_NOTICE,
                                             DB_ITEM_ID, $result['notice'][DB_ITEM_ID]
                                         )
@@ -433,13 +443,14 @@ function handleCallbackQuery(&$update) {
                             )
                         )
                     );
-                    $answer = addFootnote($text, 'آگهی با موفقیت تایید شد و در کانال قرار گرفت.' . $warning);
+                    $answer = addFootnote(appendUsername($text, $result['notice'][DB_NOTICES_APPLIER_USERNAME]),
+                         'آگهی با موفقیت تایید شد و در کانال قرار گرفت.' . $warning);
                     closeNotifications($result['notice'][DB_ITEM_ID], $answer);
                     exit();
-                } else $answer = addFootnote($text, $result['err']);
+                } else $answer = addFootnote(appendUsername($text, $result['notice'][DB_NOTICES_APPLIER_USERNAME]), $result['err']);
             }
             else
-                $answer = addFootnote($text, 'آیدی آگهی مورد نظر اشتباه است!');
+                $answer = addFootnote(appendUsername($text, $result['notice'][DB_NOTICES_APPLIER_USERNAME]), 'آیدی آگهی مورد نظر اشتباه است!');
             break;
         case INLINE_ACTION_REJECT_NOTICE:
             if(isset($data[DB_ITEM_ID])) {
@@ -450,14 +461,14 @@ function handleCallbackQuery(&$update) {
                         CHAT_ID, $result['notice'][DB_NOTICES_APPLIER_ID],
                         REPLY_TO_TAG, $result['notice'][DB_NOTICES_USER_MESSAGE_ID]
                     );
-                    $answer = addFootnote($text, " آگهی ریجکت شد.");
+                    $answer = addFootnote(appendUsername($text, $result['notice'][DB_NOTICES_APPLIER_USERNAME]), " آگهی ریجکت شد.");
                     closeNotifications($result['notice'][DB_ITEM_ID], $answer);
                     exit();
-                } else $answer = addFootnote($text, $result['err']);
+                } else $answer = addFootnote(appendUsername($text, $result['notice'][DB_NOTICES_APPLIER_USERNAME]), $result['err']);
                 break;
             }
             else
-                $answer = addFootnote($text, 'آیدی آگهی مورد نظر اشتباه است!');
+                $answer = addFootnote(appendUsername($text, $result['notice'][DB_NOTICES_APPLIER_USERNAME]), 'آیدی آگهی مورد نظر اشتباه است!');
             break;
         case INLINE_ACTION_DELEGATE_NOTICE:
             if(isset($data[DB_ITEM_ID])) {
@@ -480,38 +491,37 @@ function handleCallbackQuery(&$update) {
                     $answer = addFootnote($text, " آگهی موردنظر واگذار شد.");
                 } else
                     $answer =  addFootnote($text, " متاسفانه واگذاری این آگهی با مشکل مواجه شد. لطفا لحظاتی دیگر تلاش کنید.");
-
+                
             } else $answer =  addFootnote($text, " چنین آگهی ای یافت نشد.");
             break;
         case INLINE_ACTION_SELECT_YOUR_NOTICE:
             if(isset($data[DB_ITEM_ID]) && ($notice = getNotice($data[DB_ITEM_ID])) != null) {
                 $answer = "متن آگهی: \n" . $notice[DB_NOTICES_TEXT] . "\n\n وضعیت: \n" . ($notice[DB_NOTICES_VERIFIED] == 1 ? "تایید شده و در کانال قرار گرفته است."
-                                                                                           : (!$notice[DB_NOTICES_VERIFIED] ?
+                                                                                           : (!$notice[DB_NOTICES_VERIFIED] ? 
                                                                                                 "آگهی مطابق با قوانین نبوده و رد شده است." : "در انتظار بررسی"))
                                         . "\n\n تاریخ ثبت: \n" . $notice[DB_NOTICES_DATE];
-                if($notice[DB_NOTICES_STATE] != NOTICE_OPEN)
+                if($notice[DB_NOTICES_STATE] != NOTICE_OPEN) 
                     $answer .= $notice[DB_NOTICES_STATE] == NOTICE_DELEGATED ? "\n\n آگهی واگذار شده است." : "\n\n آگهی بسته شده است.";
-
-                $keyboard = array(
-                    INLINE_KEYBOARD => array(
-                        array(
-                            array(TEXT_TAG => 'واگذاری',
-                                CALLBACK_DATA => wrapInlineButtonData(INLINE_ACTION_DELEGATE_NOTICE,
-                                    DB_ITEM_ID, $notice[DB_ITEM_ID]
+                else if($notice[DB_NOTICES_STATE] == NOTICE_VERIFIED)
+                    $keyboard = array(
+                        INLINE_KEYBOARD => array(
+                            array(
+                                array(TEXT_TAG => 'واگذاری', 
+                                    CALLBACK_DATA => wrapInlineButtonData(INLINE_ACTION_DELEGATE_NOTICE,
+                                        DB_ITEM_ID, $notice[DB_ITEM_ID]
+                                    )
                                 )
                             )
                         )
-                    )
-                );
+                    );
             } else $answer = 'آگهی مورد نظر پیدا نشد!';
             break;
         case INLINE_ACTION_REPLY_USER:
             // admin is attempting to answer a message
-            updateAction($user_id, ACTION_WRITE_REPLY_TO_USER);
-            updateActionCache($user_id, $data[MESSAGE_ID_TAG]);
+            setActionAndCache($user_id, ACTION_WRITE_REPLY_TO_USER, $data[MESSAGE_ID_TAG]);
             $answer = 'پاسخ خودتو بنویس: (لغو /cancel)';
             if(isMessageAnswered($data[MESSAGE_ID_TAG]))
-                callMethod('answerCallbackQuery',
+                callMethod('answerCallbackQuery', 
                     'callback_query_id', $callback_id,
                     TEXT_TAG, 'این پیام قبلا پاسخ داده شده است!',
                     'show_alert', true

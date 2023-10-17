@@ -3,7 +3,7 @@ require_once './database.php';
 require_once './telegram_api.php';
 require_once './user.php';
 
-function submitNotice($applier_id, $applier_username, $text, $message_id = null, $file=null) {
+function submitNotice(string &$applier_id, string &$applier_username, string $text, $message_id = null, $file=null) {
     $fields = implode(',', array(DB_NOTICES_APPLIER_ID, DB_NOTICES_APPLIER_USERNAME, DB_NOTICES_TEXT,
         DB_NOTICES_DATE, DB_NOTICES_USER_MESSAGE_ID, DB_NOTICES_FILE_ID, DB_NOTICES_FILE_TYPE));
     $text = !hasEmojis($text) ? $text : urlencode($text);
@@ -26,7 +26,7 @@ function getNotice($notice_id): ?array {
     return $notices[0];
 }
 
-function setNoticeVerificationState($notice_id, $verification_state=NOTICE_VERIFIED): array {
+function setNoticeVerificationState($notice_id, int $verification_state=NOTICE_VERIFIED): array {
     $notice = getNotice($notice_id);
     $err = null;
     if(!$notice)
@@ -43,7 +43,7 @@ function setNoticeVerificationState($notice_id, $verification_state=NOTICE_VERIF
     return array('notice' => $notice, 'err' => $err);
 }
 
-function hasEmojis( $string ): bool {
+function hasEmojis(string &$string): bool {
     return preg_match( '([*#0-9](?>\\xEF\\xB8\\x8F)?\\xE2\\x83\\xA3|\\xC2[\\xA9\\xAE]|\\xE2..(\\xF0\\x9F\\x8F[\\xBB-\\xBF])?(?>\\xEF\\xB8\\x8F)?|\\xE3(?>\\x80[\\xB0\\xBD]|\\x8A[\\x97\\x99])(?>\\xEF\\xB8\\x8F)?|\\xF0\\x9F(?>[\\x80-\\x86].(?>\\xEF\\xB8\\x8F)?|\\x87.\\xF0\\x9F\\x87.|..(\\xF0\\x9F\\x8F[\\xBB-\\xBF])?|(((?<zwj>\\xE2\\x80\\x8D)\\xE2\\x9D\\xA4\\xEF\\xB8\\x8F\k<zwj>\\xF0\\x9F..(\k<zwj>\\xF0\\x9F\\x91.)?|(\\xE2\\x80\\x8D\\xF0\\x9F\\x91.){2,3}))?))', $string );
 }
 
@@ -53,7 +53,7 @@ function linkNoticeToChannelMessage($notice_id, $channel_message_id) {
             array('notice_id' => $notice_id, 'channel_message_id' => $channel_message_id));
 }
 
-function setNoticeState($notice_id, $state=NOTICE_DELEGATED) {
+function setNoticeState($notice_id, int $state=NOTICE_DELEGATED) {
     return Database::getInstance()->update('UPDATE ' . DB_TABLE_NOTICES . ' SET ' . DB_NOTICES_STATE
          . "=:state WHERE " . DB_ITEM_ID . '=:notice_id',
             array('notice_id' => $notice_id, 'state' => $state));

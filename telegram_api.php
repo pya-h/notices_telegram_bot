@@ -66,12 +66,12 @@ defined('INLINE_ACTION_DELEGATE_NOTICE') or define('INLINE_ACTION_DELEGATE_NOTIC
 
 
 // TELEGRAM API GENERAL FUNCTIONS
-function getUpdate($as_array = true) {
+function getUpdate(bool $as_array = true): ?array {
     $content = file_get_contents("php://input");
     return json_decode($content, $as_array);
 }
 
-function callMethod($method, ...$params) {
+function callMethod(string $method, ...$params): ?string {
     // callMethod('method', 'key1', value1, 'key2', value2, ...)
     $payload = array("method" => $method);
     $len_params = count($params);
@@ -88,7 +88,7 @@ function callMethod($method, ...$params) {
     return curl_exec($req_handle);
 }
 
-function getFileFrom($message): ?array {
+function getFileFrom(array &$message): ?array {
     $file_types = [FILE_PHOTO, FILE_VOICE, FILE_VIDEO, FILE_AUDIO, FILE_DOCUMENT];
 
     foreach($file_types as &$tag) {
@@ -103,16 +103,16 @@ function getFileFrom($message): ?array {
     return null;
 }
 
-function getSentMessageId($telegram_response) {
+function getSentMessageId(string &$telegram_response) {
     $channel_response = json_decode($telegram_response, true);
     return $channel_response['result'][MESSAGE_ID_TAG] ?? null;
 }
 
-function isUsernameValid(&$username): bool {
+function isUsernameValid(string &$username): bool {
     return preg_match("/^[a-zA-Z]{1}[A-Za-z0-9_]{4,}$/", $username) && $username[-1] != '_';
 }
 
-function wrapInlineButtonData($action, ...$params) {
+function wrapInlineButtonData(int $action, ...$params): string {
     $callback_data = array("act" => $action);
     $len_params = count($params);
     for($i = 0; $i < $len_params - 1; $i += 2) {
